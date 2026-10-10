@@ -9,6 +9,14 @@ const state = {
   log: [],
 };
 
+const CORONER_QUESTIONS = [
+  "Examine the body. How did he die?",
+  "What's in the absinthe glass?",
+  "Examine the black feather.",
+  "Any fingerprints on the glass?",
+  "Anything on the desk?",
+];
+
 const QUICK_QUESTIONS = [
   "Where were you between 11:30 and midnight?",
   "What was your relationship with Lord Silas?",
@@ -45,8 +53,9 @@ function fmtMs(ms) {
 
 function statLine(stats) {
   if (!stats) return "cached";
-  const cost = stats.cost != null ? ` · $${stats.cost.toFixed(4)}` : "";
-  return `⚡ ${stats.endpoint} · queue ${fmtMs(stats.delayMs)} · run ${fmtMs(stats.executionMs)}${cost}`;
+  const cost = stats.cost != null ? ` · $${stats.cost.toFixed(4)}` : stats.serverless ? " · billed per GPU-second" : "";
+  const cold = stats.delayMs > 20000 ? ` · ❄️ cold start` : "";
+  return `⚡ ${stats.endpoint} · queue ${fmtMs(stats.delayMs)}${cold} · run ${fmtMs(stats.executionMs)}${cost}`;
 }
 
 function flashLightning() {
@@ -68,7 +77,7 @@ function record(what, stats) {
     <div class="what">${escapeHtml(what)}</div>
     <div class="nums">queue ${fmtMs(stats.delayMs)} · exec ${fmtMs(stats.executionMs)} · round-trip ${fmtMs(stats.roundTripMs)}${
       stats.cost != null ? ` · $${stats.cost.toFixed(4)}` : ""
-    }</div>
+    }${stats.serverless ? " · <b>Runpod Serverless</b>" : ""}</div>
     <div class="nums">worker ${escapeHtml(stats.workerId || "–")}</div>`;
   $("#log-list").appendChild(li);
 
@@ -108,8 +117,20 @@ async function paint(id, label) {
 
 // ---- suspects & interrogation -----------------------------------------------
 
+function character(id) {
+  return id === "coroner" ? state.coroner : state.suspects.find((x) => x.id === id);
+}
+
 function renderSuspects() {
-  $("#suspects").innerHTML = state.suspects
+  const c = state.coroner;
+  const crypt = `
+    <div class="suspect crypt" data-id="coroner">
+      <div class="portrait"><img data-img="coroner" alt="${escapeHtml(c.name)}"><div class="img-loading">painting portrait…</div></div>
+      <h4>${escapeHtml(c.name)}</h4>
+      <div class="title">${escapeHtml(c.title)}</div>
+      <div class="crypt-status" id="crypt-status">💤 checking the crypt…</div>
+    </div>`;
+  $("#suspects").innerHTML = crypt + state.suspects
     .map(
       (s) => `
     <div class="suspect" data-id="${s.id}">
@@ -124,7 +145,7 @@ function renderSuspects() {
 }
 
 function openSuspect(id) {
-  const s = state.suspects.find((x) => x.id === id);
+  const s = character(id);
   state.current = id;
   state.histories[id] = state.histories[id] || [];
   document.querySelectorAll(".suspect").forEach((el) => el.classList.toggle("active", el.dataset.id === id));
@@ -136,15 +157,23 @@ function openSuspect(id) {
   portrait.src = state.images[id] || "";
   $("#int-name").textContent = s.name;
   $("#int-meta").textContent = `${s.title} · wearing ${s.costume}. ${s.public}`;
+  $("#bell").classList.toggle("hidden", id !== "coroner");
 
   const chat = $("#chat");
   chat.innerHTML = "";
   if (!state.histories[id].length) {
-    addMsg("assistant", `*${s.name} regards you warily from behind ${s.costume.split(",")[0]}.*`);
+    addMsg(
+      "assistant",
+      id === "coroner"
+        ? state.serverless
+          ? "*A coffin rests in the cold crypt, lid shut. Ask a question to wake him.* He runs on a Runpod Serverless endpoint that scales to zero when nobody needs him, so if he's asleep, the first answer can take a minute or two while a GPU spins up. Ring the bell to wake him early."
+          : "*The coroner looks up from his slab, wiping his hands on his apron.* Ask me about the evidence, detective."
+        : `*${s.name} regards you warily from behind ${s.costume.split(",")[0]}.*`
+    );
   }
   state.histories[id].forEach((m) => addMsg(m.role, m.content, m.stats));
 
-  $("#chips").innerHTML = QUICK_QUESTIONS.map((q) => `<button class="chip" type="button">${escapeHtml(q)}</button>`).join("");
+  $("#chips").innerHTML = (id === "coroner" ? CORONER_QUESTIONS : QUICK_QUESTIONS).map((q) => `<button class="chip" type="button">${escapeHtml(q)}</button>`).join("");
   document.querySelectorAll(".chip").forEach((c) => c.addEventListener("click", () => ask(c.textContent)));
   $("#question").focus();
   $("#interrogation").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -163,7 +192,8 @@ async function ask(question) {
   question = question.trim();
   const id = state.current;
   if (!question || !id) return;
-  const s = state.suspects.find((x) => x.id === id);
+  if (id === "coroner") return askCoroner(question);
+  const s = character(id);
   const history = state.histories[id];
 
   $("#question").value = "";
@@ -190,6 +220,88 @@ async function ask(question) {
   } finally {
     $("#ask-btn").disabled = false;
     if (state.current === id) $("#question").focus();
+  }
+}
+
+// ---- the Coroner: your own Serverless endpoint --------------------------------
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function cryptMood(h, jobStatus) {
+  if (!h || !h.serverless) return { icon: "🕯️", text: "public endpoint fallback" };
+  const w = h.workers || {};
+  if (jobStatus === "IN_PROGRESS" || w.running > 0) return { icon: "💀", text: `Awake and examining (${w.running || 1} running)` };
+  if (w.initializing > 0) return { icon: "⚰️", text: `Rising from the coffin… (${w.initializing} worker cold-starting)` };
+  if (w.idle > 0 || w.ready > 0) return { icon: "🕯️", text: `Awake (${(w.idle || 0) + (w.ready || 0)} warm worker)` };
+  return { icon: "💤", text: "Asleep in the crypt (0 workers · $0/hr)" };
+}
+
+async function refreshCrypt(jobStatus) {
+  try {
+    const h = await api("/api/coroner/health");
+    const m = cryptMood(h, jobStatus);
+    const el = $("#crypt-status");
+    if (el) el.textContent = `${m.icon} ${m.text}`;
+    return { h, m };
+  } catch (e) {
+    return { h: null, m: { icon: "❓", text: "crypt unreachable" } };
+  }
+}
+
+async function askCoroner(question, warmup = false) {
+  const c = state.coroner;
+  const history = state.histories.coroner;
+  $("#question").value = "";
+  $("#ask-btn").disabled = true;
+  $("#bell").disabled = true;
+  if (!warmup) addMsg("user", question);
+  const waiting = addMsg("assistant", "🔔 Ringing the crypt bell…", null, "thinking");
+  const t0 = Date.now();
+
+  try {
+    const { jobId } = await api("/api/coroner", warmup
+      ? { warmup: true }
+      : { question, history: history.map(({ role, content }) => ({ role, content })) });
+
+    let result = { status: "IN_QUEUE" };
+    let tick = 0;
+    while (!["COMPLETED", "FAILED", "CANCELLED", "TIMED_OUT"].includes(result.status)) {
+      await sleep(1500);
+      result = await api(`/api/coroner/status/${jobId}`);
+      if (tick++ % 2 === 0) {
+        const { m } = await refreshCrypt(result.status);
+        const secs = Math.round((Date.now() - t0) / 1000);
+        const clock = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
+        const narr =
+          result.status === "IN_PROGRESS"
+            ? "💀 The coroner peers through his spectacles…"
+            : m.icon === "⚰️"
+            ? "⚰️ The coffin lid creaks open… (a GPU worker is booting and loading Qwen3-8B)"
+            : "🔔 The bell tolls in the crypt… (job queued, waiting for a worker)";
+        waiting.innerHTML = `${escapeHtml(narr)}<span class="meta">${escapeHtml(`job ${jobId.slice(0, 8)} · ${result.status} · ${clock}`)}</span>`;
+      }
+      if (Date.now() - t0 > 10 * 60 * 1000) throw new Error("He sleeps too deeply: still queued after 10 minutes");
+    }
+    waiting.remove();
+    if (result.status !== "COMPLETED") throw new Error(result.error || result.status);
+
+    const stats = { ...result.stats, roundTripMs: Date.now() - t0, serverless: state.serverless };
+    if (warmup) {
+      addMsg("assistant", "*The coffin lid slides open. Dr. Graves sits up, blinking.* I have risen. What do you want?", stats);
+      record("Woke the Coroner (warm-up)", stats);
+    } else {
+      history.push({ role: "user", content: question }, { role: "assistant", content: result.answer, stats });
+      addMsg("assistant", result.answer, stats);
+      record(`Consulted ${c.name}`, stats);
+    }
+    flashLightning();
+  } catch (e) {
+    waiting.remove();
+    addMsg("assistant", `The crypt stays silent… (${e.message})`, null, "error");
+  } finally {
+    $("#ask-btn").disabled = false;
+    $("#bell").disabled = false;
+    refreshCrypt();
   }
 }
 
@@ -279,6 +391,8 @@ async function boot() {
   const data = await api("/api/case");
   window.MODELS = data.models;
   state.suspects = data.suspects;
+  state.coroner = data.coroner;
+  state.serverless = data.serverless;
   $("#setting").textContent = data.setting;
   $("#setting-2").textContent = data.setting;
 
@@ -288,9 +402,12 @@ async function boot() {
     $("#game").classList.add("active");
     renderSuspects();
     $("#scene-img").dataset.img = "scene";
-    // Fire all six image jobs at once: Runpod fans them out across workers in parallel.
+    // Fire all seven image jobs at once: Runpod fans them out across workers in parallel.
     paint("scene", "the crime scene");
     state.suspects.forEach((s) => paint(s.id, `portrait of ${s.name}`));
+    paint("coroner", "portrait of the Coroner");
+    refreshCrypt();
+    setInterval(() => !document.hidden && refreshCrypt(), 5000);
   });
 
   $("#notebook").value = localStorage.getItem("hollow-notebook") || "";
@@ -299,6 +416,7 @@ async function boot() {
   $("#toggle-log").addEventListener("click", () => $("#log").classList.toggle("hidden"));
   $("#close-log").addEventListener("click", () => $("#log").classList.add("hidden"));
   $("#open-accuse").addEventListener("click", openAccuse);
+  $("#bell").addEventListener("click", () => askCoroner("", true));
   $("#cancel-accuse").addEventListener("click", () => $("#accuse-modal").classList.add("hidden"));
   $("#confirm-accuse").addEventListener("click", confirmAccuse);
   $("#play-again").addEventListener("click", () => {

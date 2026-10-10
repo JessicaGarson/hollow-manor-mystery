@@ -1,15 +1,24 @@
 # 🕯️ Murder at Hollow Manor
 
-A Halloween murder mystery where every suspect is a live LLM and every portrait is painted on demand, all served by **Runpod Public Endpoints**. There's nothing to deploy and no GPUs to manage. You pay per request.
+A Halloween murder mystery where every suspect is a live LLM and every portrait is painted on demand, all served by **Runpod**.
 
-Halloween night, 1926. Lord Silas Hollow is found poisoned in his library during a masquerade ball. Players interrogate five suspects, catch them in lies, and make one accusation.
+Halloween night, 1926. Lord Silas Hollow is found poisoned in his library during a masquerade ball. Interrogate five suspects, consult the Coroner about the evidence, catch the liars, and make one accusation. Get it wrong and the killer escapes into the storm.
 
-| What | Runpod Public Endpoint |
+> Stuck, or presenting it live? The solution and a 5-minute walkthrough are in [SPOILERS.md](SPOILERS.md).
+
+## How it works
+
+| What | Runs on |
 | --- | --- |
-| Suspect dialogue + final reveal | `qwen3-32b-awq` (Qwen3 32B AWQ) |
-| Crime scene + suspect portraits | `black-forest-labs-flux-1-schnell` (FLUX.1 Schnell) |
+| Suspect dialogue + final reveal | Runpod Public Endpoint `qwen3-32b-awq` (Qwen3 32B AWQ) |
+| Crime scene + portraits | Runpod Public Endpoint `black-forest-labs-flux-1-schnell` (FLUX.1 Schnell) |
+| The Coroner (optional) | Your own Runpod Serverless endpoint that scales to zero |
 
-## Run it
+Public Endpoints mean there's nothing to deploy and no GPUs to manage. You pay per request: about $0.003 per portrait and under $0.01 per question, so a full game costs a few cents. Open the **⚡ Inference Log** in the game to see every job's latency, GPU worker, and cost.
+
+The suspects' secrets and the solution live only on the server (`case.py`), so nobody can solve the case from devtools.
+
+## Run it locally
 
 Python 3.9+ with the standard library only. There's nothing to install.
 
@@ -19,35 +28,55 @@ python3 server.py
 open http://localhost:8666
 ```
 
-Optional overrides: `PORT`, `RUNPOD_LLM_ENDPOINT`, `RUNPOD_IMAGE_ENDPOINT`.
+### Optional: put the Coroner on your own Serverless endpoint
 
-## What to show on stage
+Without this, the Coroner uses the same public LLM as the suspects. With it, he "sleeps in the crypt" on a scale-to-zero endpoint, and players watch the GPU worker cold-start when they wake him.
 
-- **⚡ Inference Log** (top right): every Runpod job with queue time, execution time, worker ID, and cost. Open it while you play.
-- **Parallel fan-out**: clicking *Enter the Manor* fires six FLUX jobs at once. They resolve in parallel across workers.
-- **Per-message stats**: every suspect reply shows the endpoint, latency, and cost underneath.
-- **Secrets stay server-side**: personas and the solution live in `case.py` and never reach the browser, so nobody can solve it from devtools.
+1. In the Runpod console, deploy a vLLM Serverless endpoint with `Qwen/Qwen3-8B`, and set max workers ≥ 1 and active (min) workers to 0.
+2. `export RUNPOD_CORONER_ENDPOINT=<endpoint id>` and restart the server.
 
-Typical costs from test runs: ~$0.003 per portrait and under $0.01 per interrogation question. A full game costs a few cents.
+## Host it publicly
 
-## Presenter cheat sheet (spoilers!) 🩸
+The server is built to sit on the open internet. The API key never reaches the browser, and spending is capped:
 
-**Rosalind Vale (the niece) did it** with aconite stolen from Dr. Crane's bag, poured into the absinthe.
+- **Per-player rate limit** on questions, accusations, and Coroner jobs.
+- **Daily budget** (UTC) across all players. Once it's spent, players see "the manor is closed for the night" until tomorrow.
+- **Portraits are generated once** and cached, so the art costs seven images total no matter how many people visit.
+- Player-facing errors are generic. Runpod error details go to the server log with a matching reference code.
+- Request size limits, no directory listing, a `/healthz` endpoint, and basic security headers.
 
-The fast path to solve it in about 5 minutes live:
+Deploy with Docker on any host (Fly.io, Render, Railway, a VM, or a Runpod CPU pod):
 
-1. **Madame Zora**: "Did anyone leave the séance early?" → Rosalind left at 11:35 and came back with anise-smelling gloves.
-2. **Finch**: "Why were you on the back stairs at 11:40?" → he confesses to stealing wine and saw a *raven mask* enter the library.
-3. **Dr. Crane**: "Is anything missing from your medical bag?" → the aconite is missing, and Rosalind lay down in the study at 10:30.
-4. **Lady Vivienne**: "What did Silas say about the will?" → he was cutting Rosalind out tomorrow.
-5. **Rosalind**: confront her with all of it, watch her squirm, then accuse.
+```bash
+docker build -t hollow-manor .
+docker run -p 8666:8666 -e RUNPOD_API_KEY=rpa_... -e DAILY_BUDGET_USD=5 hollow-manor
+```
 
-Red herrings: Vivienne and Crane's affair, Crane's gambling debt, Finch's wine theft, Zora's foot-pedal "spirit knocks."
+Put it behind HTTPS (most hosts do this for you). If a proxy or load balancer sits in front, set `TRUST_PROXY=1` so rate limits apply per player instead of per proxy. Only do this when a proxy actually sets `X-Forwarded-For`, because otherwise players can spoof it.
 
-Wrong accusations get a different ending where the killer escapes into the storm.
+The guards are per process and in memory, so run a single instance. A restart resets the daily counters and the portrait cache.
+
+**Use an API key you're willing to have spent up to the budget.** As an extra backstop, set a spend limit on your Runpod account.
+
+## Configuration
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `RUNPOD_API_KEY` | (required) | Runpod API key with Public Endpoint access |
+| `RUNPOD_CORONER_ENDPOINT` | (none) | Your Serverless endpoint ID for the Coroner |
+| `RUNPOD_LLM_ENDPOINT` | `qwen3-32b-awq` | Public Endpoint for dialogue |
+| `RUNPOD_IMAGE_ENDPOINT` | `black-forest-labs-flux-1-schnell` | Public Endpoint for images |
+| `PORT` / `HOST` | `8666` / `0.0.0.0` | Where the server listens |
+| `RATE_LIMIT_PER_MIN` | `10` | Questions per player per minute, sustained |
+| `RATE_LIMIT_BURST` | `20` | Questions a player can ask back-to-back before the limit applies |
+| `DAILY_BUDGET_USD` | `10` | Total reported spend per UTC day across all players (`0` = no cap) |
+| `DAILY_MAX_JOBS` | `5000` | Total jobs per UTC day. This also caps the Coroner, whose cost isn't reported per job |
+| `TRUST_PROXY` | off | Set to `1` to take the client IP from `X-Forwarded-For` |
+| `DEBUG` | off | Set to `1` to show raw Runpod errors in the browser |
 
 ## Files
 
-- `server.py`: tiny HTTP server that calls Runpod `/runsync` (and falls back to polling `/status`)
-- `case.py`: the mystery: setting, suspect personas, solution, image prompts
+- `server.py`: small HTTP server that calls Runpod `/runsync` (falling back to polling `/status`), plus the public-hosting guards
+- `case.py`: the mystery itself: setting, suspect personas, solution, image prompts (spoilers!)
 - `static/`: the spooky single-page UI
+- `Dockerfile`: container for public hosting
