@@ -45,6 +45,10 @@ h1 {
 .setting.small { font-size: 1rem; }
 .powered { margin-top: 2rem; color: var(--muted); font-size: .95rem; }
 .powered strong { color: var(--violet); }
+.how-to { text-align: left; display: table; margin: 1.2rem auto 1.6rem; padding-left: 1.4rem; line-height: 1.7; }
+.how-to b { color: var(--candle); }
+.fine-print { margin-top: 1rem; color: var(--muted); font-size: .8rem; }
+.fine-print a { color: var(--violet); }
 
 /* Buttons */
 .btn {
@@ -90,7 +94,7 @@ h1 {
 @keyframes pulse { 50% { opacity: .35; } }
 
 /* Suspects */
-.suspects { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; }
+.suspects { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1rem; }
 @media (max-width: 1100px) { .suspects { grid-template-columns: repeat(3, 1fr); } }
 .suspect {
   background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: .6rem;
@@ -169,3 +173,11 @@ h1 {
 .reveal-story .meta { display: block; margin-top: 1rem; font: .75rem "IBM Plex Mono", monospace; color: var(--violet); }
 .reveal-card.win { border-color: var(--candle); box-shadow: 0 0 60px rgba(242,180,92,.35); }
 .reveal-card.win h2 { color: var(--candle); }
+
+/* The Crypt: the Coroner on your own Serverless endpoint */
+.suspect.crypt { border-color: var(--violet); background: linear-gradient(180deg, #1a1530, var(--panel)); }
+.suspect.crypt .title { color: var(--violet); }
+.crypt-status { font: .68rem/1.3 "IBM Plex Mono", monospace; color: var(--ink); margin-top: .3rem; min-height: 2.6em; }
+.int-head .bell { margin-left: auto; white-space: nowrap; }
+.int-head .bell:disabled { opacity: .5; cursor: wait; }
+#log-list .nums b { color: var(--violet); }

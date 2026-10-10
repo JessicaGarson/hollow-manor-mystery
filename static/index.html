@@ -3,7 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Murder at Hollow Manor · Powered by Runpod</title>
+<title>Murder at Hollow Manor · A Halloween murder mystery</title>
+<meta name="description" content="Halloween night, 1926. Lord Silas Hollow lies poisoned in his library. Interrogate five AI-powered suspects, catch their lies, and name the killer.">
+<meta property="og:title" content="Murder at Hollow Manor">
+<meta property="og:description" content="A Halloween murder mystery where every suspect is a live LLM and every portrait is painted on demand, powered by Runpod.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta name="theme-color" content="#0b0912">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🕯️</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
@@ -18,8 +25,14 @@
     <p class="eyebrow">October 31st, 1926</p>
     <h1>Murder at<br>Hollow Manor</h1>
     <p id="setting" class="setting"></p>
+    <ol class="how-to">
+      <li><b>Interrogate</b> five suspects. Ask them anything, and watch for lies.</li>
+      <li><b>Consult the Coroner</b> about the physical evidence.</li>
+      <li><b>Accuse</b> the killer. You only get one chance.</li>
+    </ol>
     <button id="enter" class="btn btn-blood">Enter the Manor</button>
-    <p class="powered">Every suspect is a live LLM and every portrait is painted on demand,<br>served by <strong>Runpod Public Endpoints</strong>.</p>
+    <p class="powered">Every suspect is a live LLM and every portrait is painted on demand,<br>served by <strong>Runpod Public Endpoints</strong>. The Coroner sleeps in the crypt on a<br><strong>Runpod Serverless</strong> endpoint that scales to zero, and rises only when summoned.</p>
+    <p class="fine-print">Suspects are AI characters and may improvise. Your notebook stays in your browser. <a href="https://www.runpod.io" target="_blank" rel="noopener">Built on Runpod</a></p>
   </div>
 </section>
 
@@ -28,7 +41,7 @@
   <header class="topbar">
     <h2>Hollow Manor</h2>
     <div class="topbar-actions">
-      <button id="toggle-log" class="btn btn-ghost">⚡ Inference Log <span id="log-count">0</span></button>
+      <button id="toggle-log" class="btn btn-ghost" title="See every Runpod job behind the game: latency, GPU worker, and cost">⚡ Inference Log <span id="log-count">0</span></button>
       <button id="open-accuse" class="btn btn-blood">Make an Accusation</button>
     </div>
   </header>
@@ -52,6 +65,7 @@
             <h3 id="int-name"></h3>
             <p id="int-meta" class="muted"></p>
           </div>
+          <button id="bell" class="btn btn-ghost bell hidden" type="button" title="Send a tiny warm-up job to scale the endpoint up from zero">🔔 Ring the crypt bell</button>
         </div>
         <div id="chat" class="chat"></div>
         <div class="chips" id="chips"></div>

@@ -1,53 +1,62 @@
 # 🕯️ Murder at Hollow Manor
 
-A Halloween murder mystery where every suspect is a live LLM and every portrait is painted on demand, all served by **Runpod Public Endpoints**. There's nothing to deploy and no GPUs to manage. You pay per request.
+**A Halloween murder mystery where every suspect is an AI, and every one of them is hiding something.**
 
-Halloween night, 1926. Lord Silas Hollow is found poisoned in his library during a masquerade ball. Players interrogate five suspects, catch them in lies, and make one accusation.
+*Halloween night, 1926.* The masquerade ball at Hollow Manor ends with a scream at 11:58 PM. Lord Silas Hollow lies dead in his library, poisoned, a glass of green absinthe at his side and a single black feather on the carpet. The storm has washed out the only road. The killer is still in the house.
 
-| What | Runpod Public Endpoint |
-| --- | --- |
-| Suspect dialogue + final reveal | `qwen3-32b-awq` (Qwen3 32B AWQ) |
-| Crime scene + suspect portraits | `black-forest-labs-flux-1-schnell` (FLUX.1 Schnell) |
+You're the detective. Question the guests, consult the Coroner, catch them in their lies, and name the killer. You only get one accusation. Get it wrong, and they slip away into the storm.
 
-## Run it
+## Meet the suspects
 
-Python 3.9+ with the standard library only. There's nothing to install.
+Five guests, each in costume, and each with a secret. Some of those secrets have nothing to do with the murder, and they'll lie to protect them anyway.
+
+- **Lady Vivienne Hollow**, the widow. His much younger wife: composed, icy, and not visibly grieving.
+- **Dr. Ambrose Crane**, the physician. The family doctor for twenty years, twitchy and sweating.
+- **Edgar Finch**, the butler. Forty years of service, and the one who found the body.
+- **Miss Rosalind Vale**, the niece. Charming, and the presumed heir.
+- **Madame Zora**, the medium. Hired to hold a midnight séance, and claims the dead speak to her.
+
+And in the crypt below, **Dr. Mortimer Graves**, the Coroner. He only talks about the evidence, and he doesn't like being woken.
+
+## Why it's different
+
+- **Nothing is scripted.** Every suspect is a live language model playing a character. Ask anything, in your own words. Press them, bluff, play them against each other.
+- **They remember.** Suspects keep track of what they've told you, so contradictions are clues.
+- **The art is painted on demand.** The crime scene and every portrait are generated fresh by an image model when you walk in.
+- **You can't cheat.** The solution never reaches your browser, so devtools won't help you.
+- **See how it's made.** Open the **⚡ Inference Log** to watch every AI call as it happens: which GPU ran it, how long it took, and what it cost (usually a fraction of a cent).
+
+## How it's built
+
+The whole game runs on [Runpod](https://www.runpod.io), with no GPUs to rent or manage:
+
+| Part of the game | Model | Runs on |
+| --- | --- | --- |
+| Suspects and the final reveal | Qwen3 32B | Runpod Public Endpoint |
+| Crime scene and portraits | FLUX.1 Schnell | Runpod Public Endpoint |
+| The Coroner | Qwen3 8B | Runpod Serverless, scaled to zero until someone rings the crypt bell |
+
+The server is a single Python file with no dependencies. It keeps the characters' secrets server-side and passes each question to the model.
+
+## Play it yourself
+
+All you need is Python 3.9+ and a [Runpod API key](https://www.runpod.io/console/user/settings).
 
 ```bash
-export RUNPOD_API_KEY=rpa_...      # needs access to Public Endpoints (not an endpoint-restricted key)
+git clone https://github.com/JessicaGarson/hollow-manor-mystery.git
+cd hollow-manor-mystery
+export RUNPOD_API_KEY=rpa_...
 python3 server.py
-open http://localhost:8666
 ```
 
-Optional overrides: `PORT`, `RUNPOD_LLM_ENDPOINT`, `RUNPOD_IMAGE_ENDPOINT`.
+Then open http://localhost:8666. A full game costs a few cents in Runpod usage.
 
-## What to show on stage
+Want to host it for other people to play? See **[DEPLOY.md](DEPLOY.md)** for public hosting, spending limits, and the optional Coroner setup.
 
-- **⚡ Inference Log** (top right): every Runpod job with queue time, execution time, worker ID, and cost. Open it while you play.
-- **Parallel fan-out**: clicking *Enter the Manor* fires six FLUX jobs at once. They resolve in parallel across workers.
-- **Per-message stats**: every suspect reply shows the endpoint, latency, and cost underneath.
-- **Secrets stay server-side**: personas and the solution live in `case.py` and never reach the browser, so nobody can solve it from devtools.
+## Stuck?
 
-Typical costs from test runs: ~$0.003 per portrait and under $0.01 per interrogation question. A full game costs a few cents.
+The solution and a 5-minute walkthrough are in **[SPOILERS.md](SPOILERS.md)**. Don't peek until you've made your accusation. 🩸
 
-## Presenter cheat sheet (spoilers!) 🩸
+## Make your own mystery
 
-**Rosalind Vale (the niece) did it** with aconite stolen from Dr. Crane's bag, poured into the absinthe.
-
-The fast path to solve it in about 5 minutes live:
-
-1. **Madame Zora**: "Did anyone leave the séance early?" → Rosalind left at 11:35 and came back with anise-smelling gloves.
-2. **Finch**: "Why were you on the back stairs at 11:40?" → he confesses to stealing wine and saw a *raven mask* enter the library.
-3. **Dr. Crane**: "Is anything missing from your medical bag?" → the aconite is missing, and Rosalind lay down in the study at 10:30.
-4. **Lady Vivienne**: "What did Silas say about the will?" → he was cutting Rosalind out tomorrow.
-5. **Rosalind**: confront her with all of it, watch her squirm, then accuse.
-
-Red herrings: Vivienne and Crane's affair, Crane's gambling debt, Finch's wine theft, Zora's foot-pedal "spirit knocks."
-
-Wrong accusations get a different ending where the killer escapes into the storm.
-
-## Files
-
-- `server.py`: tiny HTTP server that calls Runpod `/runsync` (and falls back to polling `/status`)
-- `case.py`: the mystery: setting, suspect personas, solution, image prompts
-- `static/`: the spooky single-page UI
+The whole case lives in [`case.py`](case.py): the setting, the timeline, each suspect's personality and secrets, the solution, and the image prompts. Swap them out and you have a new mystery.
