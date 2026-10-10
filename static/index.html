@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Murder at Hollow Manor · Powered by Runpod</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Creepster&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="lightning"></div>
+<canvas id="rain"></canvas>
+
+<!-- Title screen -->
+<section id="intro" class="screen active">
+  <div class="intro-inner">
+    <p class="eyebrow">October 31st, 1926</p>
+    <h1>Murder at<br>Hollow Manor</h1>
+    <p id="setting" class="setting"></p>
+    <button id="enter" class="btn btn-blood">Enter the Manor</button>
+    <p class="powered">Every suspect is a live LLM and every portrait is painted on demand,<br>served by <strong>Runpod Public Endpoints</strong>.</p>
+  </div>
+</section>
+
+<!-- Game -->
+<section id="game" class="screen">
+  <header class="topbar">
+    <h2>Hollow Manor</h2>
+    <div class="topbar-actions">
+      <button id="toggle-log" class="btn btn-ghost">⚡ Inference Log <span id="log-count">0</span></button>
+      <button id="open-accuse" class="btn btn-blood">Make an Accusation</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="casefile">
+      <div class="scene-frame"><img id="scene-img" alt="The library" /><div class="img-loading">painting the crime scene…</div></div>
+      <h3>The Case</h3>
+      <p class="setting small" id="setting-2"></p>
+      <h3>Detective's Notebook</h3>
+      <textarea id="notebook" placeholder="Jot down clues, lies, and contradictions…"></textarea>
+    </aside>
+
+    <section class="center">
+      <div id="suspects" class="suspects"></div>
+
+      <div id="interrogation" class="interrogation hidden">
+        <div class="int-head">
+          <img id="int-portrait" alt="">
+          <div>
+            <h3 id="int-name"></h3>
+            <p id="int-meta" class="muted"></p>
+          </div>
+        </div>
+        <div id="chat" class="chat"></div>
+        <div class="chips" id="chips"></div>
+        <form id="ask-form" class="ask">
+          <input id="question" autocomplete="off" placeholder="Ask your question, detective…" maxlength="500">
+          <button class="btn btn-blood" id="ask-btn">Ask</button>
+        </form>
+      </div>
+      <p id="pick-hint" class="pick-hint">Choose a suspect to begin your interrogation.</p>
+    </section>
+  </main>
+
+  <aside id="log" class="log hidden">
+    <div class="log-head">
+      <h3>⚡ Runpod Inference Log</h3>
+      <button id="close-log" class="btn btn-ghost">×</button>
+    </div>
+    <div class="log-totals" id="log-totals"></div>
+    <ol id="log-list"></ol>
+  </aside>
+</section>
+
+<!-- Accusation modal -->
+<div id="accuse-modal" class="modal hidden">
+  <div class="modal-card">
+    <h2>J'accuse!</h2>
+    <p class="muted">Choose wisely. You only get one accusation.</p>
+    <div id="accuse-choices" class="accuse-choices"></div>
+    <textarea id="reasoning" placeholder="Explain your reasoning: motive, means, opportunity…"></textarea>
+    <div class="modal-actions">
+      <button id="cancel-accuse" class="btn btn-ghost">Not yet</button>
+      <button id="confirm-accuse" class="btn btn-blood" disabled>Accuse</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reveal -->
+<div id="reveal" class="modal hidden">
+  <div class="modal-card reveal-card">
+    <h2 id="reveal-title"></h2>
+    <div id="reveal-story" class="reveal-story"></div>
+    <div class="modal-actions">
+      <button id="play-again" class="btn btn-blood">Play Again</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
