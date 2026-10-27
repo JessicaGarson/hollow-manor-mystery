@@ -186,7 +186,8 @@ def chat(messages, max_tokens=300, temperature=0.8):
 
 
 def chat_input(messages, max_tokens=300, temperature=0.8):
-    return {"messages": messages, "max_tokens": max_tokens, "temperature": temperature}
+    # Sampling options must be nested; top-level max_tokens is silently ignored (replies cap at 100 tokens).
+    return {"messages": messages, "sampling_params": {"max_tokens": max_tokens, "temperature": temperature}}
 
 
 def chat_text(output):
