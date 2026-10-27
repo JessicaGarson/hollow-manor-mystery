@@ -6,6 +6,8 @@
 
 You're the detective. Question the guests, consult the Coroner, catch them in their lies, and name the killer. You only get one accusation. Get it wrong, and they slip away into the storm.
 
+**[▶ Play now](https://vq9kfsopdoe2m2-8666.proxy.runpod.net)**, no install needed.
+
 ## Meet the suspects
 
 Five guests, each in costume, and each with a secret. Some of those secrets have nothing to do with the murder, and they'll lie to protect them anyway.
@@ -22,9 +24,9 @@ And in the crypt below, **Dr. Mortimer Graves**, the Coroner. He only talks abou
 
 - **Nothing is scripted.** Every suspect is a live language model playing a character. Ask anything, in your own words. Press them, bluff, play them against each other.
 - **They remember.** Suspects keep track of what they've told you, so contradictions are clues.
-- **The art is painted on demand.** The crime scene and every portrait are generated fresh by an image model when you walk in.
+- **The art is painted by AI.** The crime scene and every portrait come from an image model. Each one is painted the first time anyone visits, then kept for everyone after.
 - **You can't cheat.** The solution never reaches your browser, so devtools won't help you.
-- **See how it's made.** Open the **⚡ Inference Log** to watch every AI call as it happens: which GPU ran it, how long it took, and what it cost (usually a fraction of a cent).
+- **See how it's made.** Open the **⚡ Inference Log** to watch every AI call as it happens: which Runpod worker ran it, how long it took, and what it cost (usually a fraction of a cent).
 
 ## How it's built
 
@@ -34,7 +36,7 @@ The whole game runs on [Runpod](https://www.runpod.io), with no GPUs to rent or 
 | --- | --- | --- |
 | Suspects and the final reveal | Qwen3 32B | Runpod Public Endpoint |
 | Crime scene and portraits | FLUX.1 Schnell | Runpod Public Endpoint |
-| The Coroner | Qwen3 8B | Runpod Serverless, scaled to zero until someone rings the crypt bell |
+| The Coroner | Qwen3 32B, or Qwen3 8B on his own endpoint | Runpod Public Endpoint by default. Optionally, his own Runpod Serverless endpoint that scales to zero until someone rings the crypt bell |
 
 The server is a single Python file with no dependencies. It keeps the characters' secrets server-side and passes each question to the model.
 
