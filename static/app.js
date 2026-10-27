@@ -395,6 +395,10 @@ async function boot() {
   state.serverless = data.serverless;
   $("#setting").textContent = data.setting;
   $("#setting-2").textContent = data.setting;
+  if (data.serverless) {
+    $("#coroner-line").innerHTML =
+      " The Coroner sleeps in the crypt on a<br><strong>Runpod Serverless</strong> endpoint that scales to zero, and rises only when summoned.";
+  }
 
   $("#enter").addEventListener("click", () => {
     flashLightning();
