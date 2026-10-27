@@ -171,6 +171,10 @@ h1 {
 .modal-actions { display: flex; justify-content: flex-end; gap: .6rem; margin-top: 1rem; }
 .reveal-story { font-size: 1.2rem; line-height: 1.65; white-space: pre-wrap; max-height: 60vh; overflow-y: auto; }
 .reveal-story .meta { display: block; margin-top: 1rem; font: .75rem "IBM Plex Mono", monospace; color: var(--violet); }
+.hold-tight { text-align: center; padding: 1.5rem 0; white-space: normal; }
+.hold-tight p { margin: .5rem 0; }
+.hold-title { font-size: 1.5rem; color: var(--candle); animation: pulse 1.6s infinite; }
+.hold-clock { font: .8rem "IBM Plex Mono", monospace; color: var(--violet); }
 .reveal-card.win { border-color: var(--candle); box-shadow: 0 0 60px rgba(242,180,92,.35); }
 .reveal-card.win h2 { color: var(--candle); }
 

@@ -328,26 +328,59 @@ async function confirmAccuse() {
   $("#accuse-modal").classList.add("hidden");
   $("#reveal").classList.remove("hidden");
   $("#reveal .modal-card").classList.remove("win");
+  $("#play-again").classList.add("hidden"); // no way out until the story is told
   $("#reveal-title").textContent = "The lights go out…";
   $("#reveal-story").innerHTML = `<p class="muted">You point a trembling finger at ${escapeHtml(s.name)}. Thunder shakes the manor…</p>`;
   flashLightning();
 
+  let verdict;
   try {
-    const { correct, story, killer, stats } = await api("/api/accuse", {
-      suspect: state.accused,
-      reasoning: $("#reasoning").value,
-    });
-    record(`Final reveal: accused ${s.name}`, stats);
-    flashLightning();
-    $("#reveal-title").textContent = correct ? "Case Closed" : "The Killer Escapes";
-    $("#reveal .modal-card").classList.toggle("win", correct);
-    $("#reveal-story").innerHTML =
-      prose(story) +
-      (correct ? "" : `<p class="muted"><br>The true killer was <strong>${escapeHtml(killer)}</strong>.</p>`) +
-      `<span class="meta">${escapeHtml(statLine(stats))}</span>`;
+    verdict = await api("/api/accuse", { suspect: state.accused, reasoning: $("#reasoning").value });
   } catch (e) {
     $("#reveal-title").textContent = "The spirits are silent";
     $("#reveal-story").textContent = e.message;
+    $("#play-again").classList.remove("hidden");
+    return;
+  }
+
+  // The verdict is instant; the story is written while the player reads the title.
+  const { correct, killer, jobId } = verdict;
+  const killerLine = correct ? "" : `<p class="muted"><br>The true killer was <strong>${escapeHtml(killer)}</strong>.</p>`;
+  flashLightning();
+  $("#reveal-title").textContent = correct ? "Case Closed" : "The Killer Escapes";
+  $("#reveal .modal-card").classList.toggle("win", correct);
+  const mood = correct
+    ? `Every eye turns to ${escapeHtml(s.name)}. The mask is beginning to slip.`
+    : `${escapeHtml(s.name)} rises in fury, and somewhere in the dark a door creaks open.`;
+  // No whitespace between tags: .reveal-story is pre-wrap, so newlines would show as gaps.
+  $("#reveal-story").innerHTML =
+    `<div class="hold-tight"><p class="hold-title">Hold tight, detective…</p>` +
+    `<p class="muted">${mood}</p><p class="hold-clock" id="hold-clock">0:00</p></div>` +
+    killerLine;
+
+  const t0 = Date.now();
+  const clock = setInterval(() => {
+    const secs = Math.round((Date.now() - t0) / 1000);
+    const el = $("#hold-clock");
+    if (el) el.textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
+  }, 1000);
+  try {
+    let result = { status: "IN_QUEUE" };
+    while (!["COMPLETED", "FAILED", "CANCELLED", "TIMED_OUT"].includes(result.status)) {
+      await sleep(1500);
+      result = await api(`/api/accuse/status/${jobId}`);
+      if (Date.now() - t0 > 3 * 60 * 1000) throw new Error("the storm swallowed the rest of the tale");
+    }
+    if (result.status !== "COMPLETED") throw new Error(result.error || result.status);
+    const stats = { ...result.stats, roundTripMs: Date.now() - t0 };
+    record(`Final reveal: accused ${s.name}`, stats);
+    $("#reveal-story").innerHTML = prose(result.answer) + killerLine + `<span class="meta">${escapeHtml(statLine(stats))}</span>`;
+  } catch (e) {
+    $("#reveal-story").innerHTML =
+      `<p class="muted">The rest of the tale is lost to the storm (${escapeHtml(e.message)}).</p>` + killerLine;
+  } finally {
+    clearInterval(clock);
+    $("#play-again").classList.remove("hidden");
   }
 }
 

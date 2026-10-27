@@ -118,8 +118,8 @@ limiter = RateLimiter(RATE_LIMIT_PER_MIN, RATE_LIMIT_BURST)
 budget = Budget(DAILY_BUDGET_USD, DAILY_MAX_JOBS)
 
 # Only jobs this server submitted can be polled, so the status route isn't an open proxy.
-_coroner_jobs = {}
-_coroner_lock = threading.Lock()
+_jobs = {}  # job id -> (endpoint id, submitted at)
+_jobs_lock = threading.Lock()
 _health_cache = {"at": 0, "value": None}
 
 
@@ -295,8 +295,10 @@ def accuse(body):
         verdict="CORRECT" if correct else "WRONG",
         guidance=guidance,
     )
-    story, stats = chat([{"role": "user", "content": "/no_think\n" + prompt}], max_tokens=600, temperature=0.9)
-    return 200, {"correct": correct, "story": story, "killer": case.SUSPECTS[case.KILLER]["name"], "stats": stats}
+    # The verdict is instant; the story can take a minute, so the browser polls for it.
+    messages = [{"role": "user", "content": "/no_think\n" + prompt}]
+    job_id = submit_job(LLM_ENDPOINT, chat_input(messages, max_tokens=600, temperature=0.9))
+    return 200, {"correct": correct, "killer": case.SUSPECTS[case.KILLER]["name"], "jobId": job_id}
 
 
 def portrait(body):
@@ -331,29 +333,38 @@ def coroner_ask(body):
         if not messages:
             return 400, {"error": "Ask the coroner a question."}
         payload = chat_input(messages)
+    return 200, {"jobId": submit_job(coroner_endpoint(), payload)}
+
+
+def submit_job(endpoint_id, payload):
     budget.check()
-    job = _request("POST", f"{API_ROOT}/{coroner_endpoint()}/run", {"input": payload})
+    job = _request("POST", f"{API_ROOT}/{endpoint_id}/run", {"input": payload})
+    if not job.get("id"):
+        raise RunpodError(f"No job id from /run: {str(job)[:300]}")
     now = time.time()
-    with _coroner_lock:
-        for jid, at in list(_coroner_jobs.items()):
+    with _jobs_lock:
+        for jid, (_, at) in list(_jobs.items()):
             if now - at > 3600:
-                del _coroner_jobs[jid]
-        _coroner_jobs[job.get("id")] = now
-    return 200, {"jobId": job.get("id"), "status": job.get("status"), "submittedAt": now}
+                del _jobs[jid]
+        _jobs[job["id"]] = (endpoint_id, now)
+    return job["id"]
 
 
-def coroner_status(job_id):
-    with _coroner_lock:
-        if job_id not in _coroner_jobs:
-            return 404, {"error": "No such job."}
-    job = _request("GET", f"{API_ROOT}/{coroner_endpoint()}/status/{job_id}")
+def job_status(job_id):
+    with _jobs_lock:
+        entry = _jobs.get(job_id)
+    if not entry:
+        return 404, {"error": "No such job."}
+    endpoint_id = entry[0]
+    job = _request("GET", f"{API_ROOT}/{endpoint_id}/status/{job_id}")
     status = job.get("status")
     result = {"status": status}
     if status == "COMPLETED":
-        with _coroner_lock:
-            _coroner_jobs.pop(job_id, None)
+        with _jobs_lock:
+            if _jobs.pop(job_id, None) is None:
+                return 404, {"error": "No such job."}  # another poll already collected (and charged) it
         result["answer"] = chat_text(job.get("output"))
-        result["stats"] = job_stats(coroner_endpoint(), job)
+        result["stats"] = job_stats(endpoint_id, job)
         budget.charge(result["stats"]["cost"])
     elif status in ("FAILED", "CANCELLED", "TIMED_OUT"):
         result["error"] = str(job.get("error") or status)
@@ -432,11 +443,11 @@ class Handler(SimpleHTTPRequestHandler):
             return self._send_json(200, public_case())
         if path == "/api/coroner/health":
             return self._guarded(coroner_health)
-        if path.startswith("/api/coroner/status/"):
+        if path.startswith(("/api/coroner/status/", "/api/accuse/status/")):
             job_id = path.rsplit("/", 1)[-1]
             if not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", job_id):
                 return self._send_json(400, {"error": "Bad job id"})
-            return self._guarded(lambda: coroner_status(job_id))
+            return self._guarded(lambda: job_status(job_id))
         if path.startswith("/api/"):
             return self._send_json(404, {"error": "Not found"})
         return super().do_GET()
