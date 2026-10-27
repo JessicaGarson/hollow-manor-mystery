@@ -399,6 +399,8 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
         self.send_header("X-Frame-Options", "DENY")
+        # Static files must revalidate, or a browser can pair a stale app.js with a newer API after a deploy.
+        self.send_header("Cache-Control", "no-store" if self.path.startswith("/api/") else "no-cache")
         super().end_headers()
 
     def list_directory(self, path):
@@ -413,7 +415,6 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(data)))
-        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(data)
 
